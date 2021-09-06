@@ -1,3 +1,11 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define LIST_SIZE 256
+#define VAR_NAME 32
+
+/* SME NODE */
 enum SMEType {
 	SMENum,
 	SMEAdd,
@@ -5,8 +13,11 @@ enum SMEType {
 	SMEMul,
 	SMEDiv,
 	SMENeg,
+	SMEPos,
 	SMELP,
 	SMERP,
+	SMEFloor,
+	SMECeil,
 	SMENull,
 };
 
@@ -17,6 +28,40 @@ typedef struct _SMENode {
 	struct _SMENode* right;
 } SMENode;
 
+
+/* SME TOKEN */
+typedef struct _SMEToken {
+	enum SMEType type;
+	double value;
+} SMEToken;
+
+
+/* SME LIST */
+typedef struct _SMEList {
+	int heap_size;
+	int count;
+	void** items;
+} SMEList;
+
+/* SME Variable */
+typedef struct _SMEVar {
+	char* name;
+	double value;
+} SMEVar;
+
+/* SME TOKENIZER */
+typedef struct _SMETokenizer {
+	char* buffer;
+	char* temp;
+	int idx;
+	int tidx;
+	SMEList* list;
+	SMEList* variables;
+	SMEToken* current;
+} SMETokenizer;
+
+
+/* NODE IMPLEMENTATION */
 SMENode* new_SMENode(enum SMEType type) {
 	SMENode* node = (SMENode*)malloc(sizeof(SMENode));
 	node->type = type;
@@ -34,11 +79,32 @@ void free_SMENode(SMENode* node) {
 	free(node);
 }
 
-typedef struct _SMEToken {
-	enum SMEType type;
-	double value;
-} SMEToken;
+void print_SMENode(SMENode* node) {
+	if (node) {
+		printf("(");
+		if(node->left)
+			print_SMENode(node->left);
+		
+		if (node->type == SMEAdd) {
+			printf("+");
+		} else if (node->type == SMESub) {
+			printf("-");
+		} else if (node->type == SMEMul) {
+			printf("*");
+		} else if (node->type == SMEDiv) {
+			printf("/");
+		} else if (node->type == SMENum) {
 
+			printf("%.2lf", node->value);
+		}
+
+		if (node->right)
+			print_SMENode(node->right);
+		printf(")");
+	}
+}
+
+/* TOKEN IMPLEMENTATION */
 SMEToken* new_SMEToken(enum SMEType type) {
 	SMEToken* token = (SMEToken*)malloc(sizeof(SMEToken));
 	token->type = type;
@@ -46,12 +112,6 @@ SMEToken* new_SMEToken(enum SMEType type) {
 	return token;
 }
 
-/* XML LIST */
-typedef struct _SMEList {
-	int heap_size;
-	int count;
-	void** items;
-} SMEList;
 
 /* LIST IMPLEMENTATION */
 SMEList* new_SMEList() {
@@ -61,7 +121,7 @@ SMEList* new_SMEList() {
 		exit(1);
 	}
 	list->count = 0;
-	list->heap_size = NODE_SIZE;
+	list->heap_size = LIST_SIZE;
 	list->items = malloc(sizeof(void*) * list->heap_size);
 	return list;
 }
@@ -85,41 +145,54 @@ void free_SMEList(SMEList* list) {
 }
 
 
-typedef struct _SMETokens {
-	char* buffer;
-	char* temp;
-	int idx;
-	int tidx;
-	SMEList* list;
-	SMEToken* current;
-} SMETokens;
-
-SMETokens* new_SMETokens(char* buffer) {
-	SMETokens* tokens = (SMETokens*) malloc(sizeof(SMETokens));
-	tokens->buffer = buffer;
-	tokens->temp = (char*) malloc(sizeof(char) * 256);
-	tokens->idx = 0;
-	tokens->tidx = 0;
-	tokens->list = new_SMEList();
-	tokens->current = NULL;
-
-	return tokens;
+/* VARIABLE IMPLEMENTATION */
+SMEVar* new_SMEVar(const char* name, double value) {
+	SMEVar* var = malloc(sizeof(SMEVar));
+	var->name = malloc(sizeof(char) * strlen(name) + 1);
+	strcpy(var->name, name);
+	var->value = value;
+	return var;
 }
 
-void free_SMETokens(SMETokens* tokens) {
-	free(tokens->temp);
-	for (int i = 0; i < tokens->list->count; i++) {
-		free(tokens->list->items[i]);
+void free_SMEVar(SMEVar* var) {
+	free(var->name);
+	free(var);
+}
+
+
+/* TOKENIZER IMPLEMENTATION */
+SMETokenizer* new_SMETokenizer(char* buffer) {
+	SMETokenizer* tokenizer = (SMETokenizer*) malloc(sizeof(SMETokenizer));
+	tokenizer->buffer = buffer;
+	tokenizer->temp = (char*) malloc(sizeof(char) * 256);
+	tokenizer->idx = 0;
+	tokenizer->tidx = 0;
+	tokenizer->list = new_SMEList();
+	tokenizer->variables = NULL;
+	tokenizer->current = NULL;
+
+	return tokenizer;
+}
+
+void free_SMETokenizer(SMETokenizer* tokenizer) {
+	free(tokenizer->temp);
+	for (int i = 0; i < tokenizer->list->count; i++) {
+		free(tokenizer->list->items[i]);
 	}
-	free_SMEList(tokens->list);
-	free(tokens);
+	free_SMEList(tokenizer->list);
+
+	for (int i = 0; i < tokenizer->variables->count; i++) {
+		free_SMEVar(tokenizer->variables->items[i]);
+	}
+	free_SMEList(tokenizer->variables);
+	free(tokenizer);
 }
 
-void advance_SMETokens(SMETokens* tokens) {
-	if (tokens->tidx + 1 <= tokens->list->count)
-		tokens->current = tokens->list->items[tokens->tidx++];
+void advance_SMETokenizer(SMETokenizer* tokenizer) {
+	if (tokenizer->tidx + 1 <= tokenizer->list->count)
+		tokenizer->current = tokenizer->list->items[tokenizer->tidx++];
 	else
-		tokens->current = NULL;
+		tokenizer->current = NULL;
 }
 
 int is_digit(const char c) {
@@ -127,74 +200,189 @@ int is_digit(const char c) {
 	return 0;
 }
 
-SMENode* sme_term(SMETokens* tokens);
-SMENode* sme_expr(SMETokens* tokens);
+int is_alpha(char c) {
+	if ((c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A)) return 1;
+	return 0;
+}
 
 
-SMENode* sme_factor(SMETokens* tokens) {
-	SMEToken* token = tokens->current;
+/* TOKENIZER */
+SMETokenizer* sme_tokenize(const char* buffer, SMEList* variables) {
+	SMETokenizer* tokenizer = new_SMETokenizer(buffer);
+	tokenizer->variables = variables;
+	SMEToken* token = NULL;
+	while (tokenizer->buffer[tokenizer->idx]) {
+		if (is_digit(tokenizer->buffer[tokenizer->idx])) {
+			/* Load each digit in the number into the temp buffer */
+			while (is_digit(tokenizer->buffer[tokenizer->idx])) {
+				tokenizer->temp[tokenizer->tidx++] = tokenizer->buffer[tokenizer->idx++];
+				/* In case we have a floating point value keep the dot */
+				if (tokenizer->buffer[tokenizer->idx] == '.')
+					tokenizer->temp[tokenizer->tidx++] = tokenizer->buffer[tokenizer->idx++];
+			}
+			tokenizer->temp[tokenizer->tidx] = '\0';
+
+			token = new_SMEToken(SMENum);
+			token->value = strtod(tokenizer->temp, NULL);
+
+			append_SMEItem(tokenizer->list, token);
+
+			tokenizer->tidx = 0;
+		}
+		if (is_alpha(tokenizer->buffer[tokenizer->idx])) {
+			tokenizer->tidx = 0;
+			/* Load the variable / function name into the temp buffer */
+			while (is_alpha(tokenizer->buffer[tokenizer->idx])) {
+				tokenizer->temp[tokenizer->tidx++] = tokenizer->buffer[tokenizer->idx++];
+			}
+			tokenizer->temp[tokenizer->tidx] = '\0';
+			
+			if (!strcmp(tokenizer->temp, "floor\0")) {
+				token = new_SMEToken(SMEFloor);
+				append_SMEItem(tokenizer->list, token);
+			}
+			else if (!strcmp(tokenizer->temp, "ceil\0")) {
+				token = new_SMEToken(SMECeil);
+				append_SMEItem(tokenizer->list, token);
+			}
+			else {
+				for (int i = 0; i < tokenizer->variables->count; i++) {
+					SMEVar* var = tokenizer->variables->items[i];
+					if (!strcmp(tokenizer->temp, var->name)) {
+						token = new_SMEToken(SMENum);
+						token->value = var->value;
+						append_SMEItem(tokenizer->list, token);
+					}
+				}
+			}
+			tokenizer->tidx = 0;
+		}
+		/* Check operator */
+		if (tokenizer->buffer[tokenizer->idx] == '+') {
+			token = new_SMEToken(SMEAdd);
+			token->value = strtod(tokenizer->temp, NULL);
+			append_SMEItem(tokenizer->list, token);
+		}
+		else if (tokenizer->buffer[tokenizer->idx] == '-') {
+			token = new_SMEToken(SMESub);
+			token->value = strtod(tokenizer->temp, NULL);
+			append_SMEItem(tokenizer->list, token);
+		}
+		else if (tokenizer->buffer[tokenizer->idx] == '/') {
+			token = new_SMEToken(SMEDiv);
+			token->value = strtod(tokenizer->temp, NULL);
+			append_SMEItem(tokenizer->list, token);
+		}
+		else if (tokenizer->buffer[tokenizer->idx] == '*') {
+			token = new_SMEToken(SMEMul);
+			token->value = strtod(tokenizer->temp, NULL);
+			append_SMEItem(tokenizer->list, token);
+		}
+		else if (tokenizer->buffer[tokenizer->idx] == '(') {
+			token = new_SMEToken(SMELP);
+			token->value = strtod(tokenizer->temp, NULL);
+			append_SMEItem(tokenizer->list, token);
+		}
+		else if (tokenizer->buffer[tokenizer->idx] == ')') {
+			token = new_SMEToken(SMERP);
+			token->value = strtod(tokenizer->temp, NULL);
+			append_SMEItem(tokenizer->list, token);
+		}
+		tokenizer->idx++;
+	}
+
+	tokenizer->tidx = 0;
+}
+
+
+/* PARSER*/
+SMENode* sme_term(SMETokenizer* tokenizer);
+SMENode* sme_expr(SMETokenizer* tokenizer);
+
+SMENode* sme_factor(SMETokenizer* tokenizer) {
+	SMEToken* token = tokenizer->current;
 	SMENode* result;
 
-	if (token == NULL) return NULL;
-
 	if (token->type == SMELP) {
-		advance_SMETokens(tokens);
-		SMENode* result = sme_expr(tokens);
-		if (tokens->current->type != SMERP) printf("Missing right parenthesis\n");
-
-		advance_SMETokens(tokens);
+		advance_SMETokenizer(tokenizer);
+		result = sme_expr(tokenizer);
+		if (tokenizer->current->type != SMERP) printf("Missing right parenthesis\n");
+		advance_SMETokenizer(tokenizer);
 		return result;
 	} else if (token->type == SMENum){
-		advance_SMETokens(tokens);
+		advance_SMETokenizer(tokenizer);
 		result = new_SMENode(SMENum);
 		result->value = token->value;
 		return result;
 	} else if (token->type == SMESub) {
-		advance_SMETokens(tokens);
+		advance_SMETokenizer(tokenizer);
 		result = new_SMENode(SMENeg);
-		result->left = sme_factor(tokens);
+		result->left = sme_factor(tokenizer);
 		return result;
 	}
-	printf("FACTOR EOF OH NO");
+	else if (token->type == SMEAdd) {
+		advance_SMETokenizer(tokenizer);
+		result = new_SMENode(SMEPos);
+		result->left = sme_factor(tokenizer);
+		return result;
+	}
+	else if (token->type == SMEFloor) {
+		advance_SMETokenizer(tokenizer);
+		result = new_SMENode(SMEFloor);
+		result->left = sme_factor(tokenizer);
+		return result;
+	}
+	else if (token->type == SMECeil) {
+		advance_SMETokenizer(tokenizer);
+		result = new_SMENode(SMECeil);
+		result->left = sme_factor(tokenizer);
+		return result;
+	}
 }
 
-SMENode* sme_term(SMETokens* tokens) {
-	SMENode* factor = sme_factor(tokens);
-	SMENode* result = NULL;
-	if (tokens->current != NULL){
-		if (tokens->current->type == SMEMul) {
-			advance_SMETokens(tokens);
-			result = new_SMENode(SMEMul);
-			result->left = factor;
-			result->right = sme_factor(tokens);
-		} else if (tokens->current->type == SMEDiv) {
-			advance_SMETokens(tokens);
-			result = new_SMENode(SMEDiv);
-			result->left = factor;
-			result->right = sme_factor(tokens);
-		}
-	} 
-	if(result) return result;
-	return factor;
-}
-
-SMENode* sme_expr(SMETokens* tokens) {
-	SMENode* term = sme_term(tokens);
-	SMENode* result = NULL;
-	if (tokens->current != NULL) {
-		if (tokens->current->type == SMEAdd) {
-			advance_SMETokens(tokens);
-			result = new_SMENode(SMEAdd);
-			result->left = term;
-			result->right = sme_term(tokens);
-		} else if (tokens->current->type == SMESub) {
-			advance_SMETokens(tokens);
-			result = new_SMENode(SMESub);
-			result->left = term;
-			result->right = sme_term(tokens);
-		}
+SMENode* sme_term(SMETokenizer* tokenizer) {
+	SMENode* result = sme_factor(tokenizer);
+	SMENode* temp = NULL;
+	while (tokenizer->current != NULL && (tokenizer->current->type == SMEMul || tokenizer->current->type == SMEDiv)) {
+		temp = result;
+		result = new_SMENode(tokenizer->current->type);
+		result->left = temp;
+		advance_SMETokenizer(tokenizer);
+		result->right = sme_term(tokenizer);
 	}
 	return result;
+}
+
+SMENode* sme_expr(SMETokenizer* tokenizer) {
+	SMENode* result = sme_term(tokenizer);
+	SMENode* temp = NULL;
+
+	while (tokenizer->current != NULL && (tokenizer->current->type == SMEAdd || tokenizer->current->type == SMESub)) {
+		temp = result;
+		result = new_SMENode(tokenizer->current->type);
+		result->left = temp;
+		advance_SMETokenizer(tokenizer);
+		result->right = sme_term(tokenizer);
+	}
+	return result;
+}
+
+SMENode* sme_parse(SMETokenizer* tokenizer) {
+	advance_SMETokenizer(tokenizer);
+	return sme_expr(tokenizer);
+}
+
+/* EVALUATION */
+double floor(double value) {
+	if (value < 0) {
+		return (int)(value + (-1));
+	}
+	return (int)value;
+}
+
+double ceil(double value) {
+	if (value - (int)value == 0) return 0;
+	return floor(value) + 1;
 }
 
 double sme_eval(SMENode* node) {
@@ -230,61 +418,20 @@ double sme_eval(SMENode* node) {
 		res = -left;
 		return res;
 	}
-	return res;
-}
-
-SMETokens* sme_parse(const char* buffer) {
-	SMETokens* tokens = new_SMETokens("-23.01 + (2 - (2 + 4)) * 4");
-	SMEToken* token = NULL;
-	while (tokens->buffer[tokens->idx]) {
-		if (is_digit(tokens->buffer[tokens->idx])) {
-			while (is_digit(tokens->buffer[tokens->idx])) {
-				tokens->temp[tokens->tidx++] = tokens->buffer[tokens->idx++];
-				/* In case we have a floating point value keep the dot */
-				if (tokens->buffer[tokens->idx] == '.')
-					tokens->temp[tokens->tidx++] = tokens->buffer[tokens->idx++];
-			}
-			tokens->temp[tokens->tidx] = '\0';
-
-			token = new_SMEToken(SMENum);
-			token->value = strtod(tokens->temp, NULL);
-
-			append_SMEItem(tokens->list, token);
-
-			tokens->tidx = 0;
-		}
-		if (tokens->buffer[tokens->idx] == '+') {
-			token = new_SMEToken(SMEAdd);
-			token->value = strtod(tokens->temp, NULL);
-			append_SMEItem(tokens->list, token);
-		}
-		else if (tokens->buffer[tokens->idx] == '-') {
-			token = new_SMEToken(SMESub);
-			token->value = strtod(tokens->temp, NULL);
-			append_SMEItem(tokens->list, token);
-		}
-		else if (tokens->buffer[tokens->idx] == '/') {
-			token = new_SMEToken(SMEDiv);
-			token->value = strtod(tokens->temp, NULL);
-			append_SMEItem(tokens->list, token);
-		}
-		else if (tokens->buffer[tokens->idx] == '*') {
-			token = new_SMEToken(SMEMul);
-			token->value = strtod(tokens->temp, NULL);
-			append_SMEItem(tokens->list, token);
-		}
-		else if (tokens->buffer[tokens->idx] == '(') {
-			token = new_SMEToken(SMELP);
-			token->value = strtod(tokens->temp, NULL);
-			append_SMEItem(tokens->list, token);
-		}
-		else if (tokens->buffer[tokens->idx] == ')') {
-			token = new_SMEToken(SMERP);
-			token->value = strtod(tokens->temp, NULL);
-			append_SMEItem(tokens->list, token);
-		}
-		tokens->idx++;
+	else if (node->type == SMEPos) {
+		left = sme_eval(node->left);
+		res = left > 0 ? left : -left;
+		return res;
 	}
-
-	tokens->tidx = 0;
+	else if (node->type == SMEFloor) {
+		left = sme_eval(node->left);
+		res = floor(left);
+		return res;
+	}
+	else if (node->type == SMECeil) {
+		left = sme_eval(node->left);
+		res = ceil(left);
+		return res;
+	}
+	return res;
 }
