@@ -6,6 +6,7 @@ int main(){
     char var_name[32];
     char var_value[32];
     SMEList *vars = new_SMEList();
+    printf("\nSimple math evaluator\nTo add variable type (:name=value)\nTo quit type (quit)\n\n");
     while(flag){
         printf("sme> ");
         scanf("%s", &buffer);
@@ -21,9 +22,10 @@ int main(){
             i++;
             var_name[j] = '\0';
             j = 0;
-            while(buffer[i]){
+            while(buffer[i] != ':'){
                 var_value[j++] = buffer[i++];
             }
+            var_value[j] = '\0';
             SMEVar* var = new_SMEVar(var_name, strtod(var_value, NULL));
             append_SMEItem(vars, var);
         }else {
