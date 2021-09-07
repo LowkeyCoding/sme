@@ -323,42 +323,41 @@ SMENode* sme_expr(SMETokenizer* tokenizer);
 SMENode* sme_factor(SMETokenizer* tokenizer) {
 	SMEToken* token = tokenizer->current;
 	SMENode* result;
-
-	if (token->type == SMELP) {
-		advance_SMETokenizer(tokenizer);
-		result = sme_expr(tokenizer);
-		if (tokenizer->current->type != SMERP) printf("Missing right parenthesis\n");
-		advance_SMETokenizer(tokenizer);
-		return result;
-	} else if (token->type == SMENum){
-		advance_SMETokenizer(tokenizer);
-		result = new_SMENode(SMENum);
-		result->value = token->value;
-		return result;
-	} else if (token->type == SMESub) {
-		advance_SMETokenizer(tokenizer);
-		result = new_SMENode(SMENeg);
-		result->left = sme_factor(tokenizer);
-		return result;
+	if(token != NULL) {
+		if (token->type == SMELP) {
+			advance_SMETokenizer(tokenizer);
+			result = sme_expr(tokenizer);
+			if (tokenizer->current->type != SMERP) printf("Missing right parenthesis\n");
+			advance_SMETokenizer(tokenizer);
+			return result;
+		} else if (token->type == SMENum){
+			advance_SMETokenizer(tokenizer);
+			result = new_SMENode(SMENum);
+			result->value = token->value;
+			return result;
+		} else if (token->type == SMESub) {
+			advance_SMETokenizer(tokenizer);
+			result = new_SMENode(SMENeg);
+			result->left = sme_factor(tokenizer);
+			return result;
+		} else if (token->type == SMEAdd) {
+			advance_SMETokenizer(tokenizer);
+			result = new_SMENode(SMEPos);
+			result->left = sme_factor(tokenizer);
+			return result;
+		} else if (token->type == SMEFloor) {
+			advance_SMETokenizer(tokenizer);
+			result = new_SMENode(SMEFloor);
+			result->left = sme_factor(tokenizer);
+			return result;
+		} else if (token->type == SMECeil) {
+			advance_SMETokenizer(tokenizer);
+			result = new_SMENode(SMECeil);
+			result->left = sme_factor(tokenizer);
+			return result;
+		}
 	}
-	else if (token->type == SMEAdd) {
-		advance_SMETokenizer(tokenizer);
-		result = new_SMENode(SMEPos);
-		result->left = sme_factor(tokenizer);
-		return result;
-	}
-	else if (token->type == SMEFloor) {
-		advance_SMETokenizer(tokenizer);
-		result = new_SMENode(SMEFloor);
-		result->left = sme_factor(tokenizer);
-		return result;
-	}
-	else if (token->type == SMECeil) {
-		advance_SMETokenizer(tokenizer);
-		result = new_SMENode(SMECeil);
-		result->left = sme_factor(tokenizer);
-		return result;
-	}
+	return NULL;
 }
 
 SMENode* sme_term(SMETokenizer* tokenizer) {

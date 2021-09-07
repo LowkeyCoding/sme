@@ -29,7 +29,7 @@ int main(){
         }else {
             SMETokenizer* tokenizer = sme_tokenize(buffer, vars);
             SMENode* root = sme_parse(tokenizer);
-            printf("\nResult: %lf\n", sme_eval(root));
+            printf("\nResult: %lf\n\n", sme_eval(root));
             tokenizer->variables = NULL;
             free_SMETokenizer(tokenizer);
             free_SMENode(root);
