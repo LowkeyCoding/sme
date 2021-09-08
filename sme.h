@@ -84,7 +84,6 @@ void free_SMENode(SMENode* node) {
 
 void print_SMENode(SMENode* node) {
 	if (node) {
-		printf("(");
 		if(node->left)
 			print_SMENode(node->left);
 		
@@ -96,14 +95,16 @@ void print_SMENode(SMENode* node) {
 			printf("*");
 		} else if (node->type == SMEDiv) {
 			printf("/");
+		} else if (node->type == SMEPos) {
+			printf("pos");
+		} else if (node->type == SMENeg) {
+			printf("neg");
 		} else if (node->type == SMENum) {
-
 			printf("%.2lf", node->value);
 		}
 
 		if (node->right)
 			print_SMENode(node->right);
-		printf(")");
 	}
 }
 
@@ -402,7 +403,7 @@ double floor(double value) {
 }
 
 double ceil(double value) {
-	if (value - (int)value == 0) return 0;
+	if (value - (int)value == 0) return value;
 	return floor(value) + 1;
 }
 
