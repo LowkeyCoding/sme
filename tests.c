@@ -5,7 +5,7 @@ SMETokenizer* tokenizer;
 SMENode* root;
 SMEList *vars;
 
-float values[] = {2,4,2.2,5.4,22,2,33.4,2.4,2.4};
+double values[] = {2,4,2.2,5.4,22,2,33.4,2.4,2.4};
 
 void test_tokenizer(CuTest* tc){
     vars = new_SMEList();
@@ -68,7 +68,24 @@ void test_evaluator(CuTest* tc){
 }
 
 void test_variables(CuTest* tc){
-
+    vars = new_SMEList();
+    append_SMEItem(vars, new_SMEVar("a", 3.4));
+    append_SMEItem(vars, new_SMEVar("b", 5.6));
+    append_SMEItem(vars, new_SMEVar("x", -9.23));
+    append_SMEItem(vars, new_SMEVar("y", 2));
+    tokenizer = sme_tokenize("a + b * x / y", vars);
+    int ttypes[] = { SMENum, SMEAdd, SMENum, SMEMul, SMENum, SMEDiv, SMENum };
+    double tvalues[] = { 3.4, 5.6, -9.23, 2};
+    int j = 0;
+    for(int i=0; i < tokenizer->list->count; i++){
+        SMEToken* token = tokenizer->list->items[i];
+        CuAssertIntEquals(tc, ttypes[i], token->type);
+        if(token->type == SMENum){
+            CuAssertDblEquals(tc, tvalues[j], token->value, 0.001);
+            j++;
+        }
+    }
+    free_SMETokenizer(tokenizer);
 }
 
 /* Add all the tests to the test suite. */
