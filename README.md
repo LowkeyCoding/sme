@@ -2,9 +2,25 @@
 Simple math evaluation
 
 # Build
+To run tests, run `make tests` then run `./test` 
+```
+Runing 4 tests:
 
+1) TOKENIZER: Passed
+2) PARSER:    Passed
+3) EVALUATOR: Passed
+4) VARIABLES: Passed
 
+Runs: 4 Passes: 4 Fails: 0
+```
+To run repl, run `make repl` then run `./repl`
+```
+Simple math evaluator
+To add variable type (:name=value)
+To quit type (quit)
 
+sme>
+```
 # Usage
 
 ## Just calculate some math
