@@ -10,13 +10,13 @@ double values[] = {2,4,2.2,5.4,22,2,33.4,2.4,2.4};
 void test_tokenizer(CuTest* tc){
     vars = new_SMEList();
     tokenizer = sme_tokenize("+(2 * (4 / (2.2 + -5.4) - 22) * 2 + ceil(floor(33.4 + 2.4) * 2.4))", vars);
-    
+
     int types[] = {
-        SMEAdd, SMELP, SMENum, SMEMul, SMELP, SMENum, SMEDiv, 
-        SMELP, SMENum, SMEAdd, SMESub, SMENum, SMERP, SMESub, 
-        SMENum, SMERP, SMEMul, SMENum, SMEAdd, SMECeil, SMELP,
-        SMEFloor, SMELP, SMENum, SMEAdd, SMENum, SMERP, SMEMul,
-        SMENum, SMERP, SMERP
+            SMEAdd, SMELP, SMENum, SMEMul, SMELP, SMENum, SMEDiv,
+            SMELP, SMENum, SMEAdd, SMESub, SMENum, SMERP, SMESub,
+            SMENum, SMERP, SMEMul, SMENum, SMEAdd, SMECeil, SMELP,
+            SMEFloor, SMELP, SMENum, SMEAdd, SMENum, SMERP, SMEMul,
+            SMENum, SMERP, SMERP
     };
 
     int j = 0;
@@ -31,9 +31,9 @@ void test_tokenizer(CuTest* tc){
 }
 
 int node_types[] = {
-    SMENum, SMENum, SMENum, SMENum, SMENeg, SMEAdd, SMEDiv,
-    SMENum, SMESub, SMENum, SMEMul, SMEMul, SMENum, SMENum, 
-    SMEAdd, SMEFloor, SMENum, SMEMul, SMECeil, SMEAdd, SMEPos
+        SMENum, SMENum, SMENum, SMENum, SMENeg, SMEAdd, SMEDiv,
+        SMENum, SMESub, SMENum, SMEMul, SMEMul, SMENum, SMENum,
+        SMEAdd, SMEFloor, SMENum, SMEMul, SMECeil, SMEAdd, SMEPos
 };
 
 int node_index = 0;
@@ -101,18 +101,18 @@ CuSuite* test_suite() {
 
 /* Runs all the tests and prints the result. */
 void all_tests() {
-	CuString *output = CuStringNew();
-	CuSuite *suite = CuSuiteNew();
+    CuString *output = CuStringNew();
+    CuSuite *suite = CuSuiteNew();
 
-	CuSuiteAddSuite(suite, test_suite());
+    CuSuiteAddSuite(suite, test_suite());
 
-	CuSuiteRun(suite);
-	CuSuiteDetails(suite, output);
-	printf("%s\n", output->buffer);
+    CuSuiteRun(suite);
+    CuSuiteDetails(suite, output);
+    printf("%s\n", output->buffer);
 }
 
 
 int main(void) {
-  all_tests();
-  return 0;
+    all_tests();
+    return 0;
 }
